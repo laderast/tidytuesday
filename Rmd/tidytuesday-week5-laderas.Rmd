@@ -1,0 +1,69 @@
+---
+title: "Tidy Tuesday Week 5: County Data"
+author: "Ted Laderas"
+date: "4/30/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(tidyverse)
+library(skimr)
+library(cowplot)
+county_data <- read.csv("data/acs2015_county_data.csv")
+```
+
+## Skim the Variables
+
+https://github.com/rfordatascience/tidytuesday/blob/master/data/acs2015_county_data.csv
+
+```{r}
+skimr::skim(county_data)
+```
+
+## How many counties does each state have?
+
+```{r}
+county_data %>% count(State) %>% arrange(desc(n))
+```
+
+## County Data by State
+
+```{r}
+per_cap_state <- county_data %>% ggplot(aes(x=reorder(State, IncomePerCap, FUN = median), y=IncomePerCap)) + geom_boxplot() + theme(axis.text.x = element_text(angle=90)) + ggtitle("Income Per Capita By State")
+
+per_cap_state
+```
+
+## Let's Look at Rhode Island
+
+Here we look at a subset of the variables and compare the boxplots of the Rhode Island values to the other states.
+
+```{r}
+county_data %>% mutate(is_ri = ifelse(State == "Rhode Island", "RI", "OTHER")) %>%
+  tidyr::gather("variable", "value", -CensusId, -State, -County, -TotalPop, -Men, -Women, -is_ri, -Employed, -Citizen, -Income, -IncomeErr,-IncomePerCap, -IncomePerCapErr) %>%
+  ggplot(aes(x=variable, y=value, group=is_ri, fill=is_ri)) + geom_boxplot() + facet_grid(.~variable,scales = "free_x")  + theme(axis.text.x = element_text(angle=90)) 
+```
+
+If we pick out some of the variables that show a large difference, we get the below plot:
+
+```{r}
+large_diff_variables <- c("Carpool", "ChildPoverty", "Construction", "Poverty", "PrivateWork", "Production", "Professional")
+
+large_diff <- county_data %>% mutate(is_ri = ifelse(State == "Rhode Island", "RI", "OTHER")) %>%
+  tidyr::gather("variable", "value", -CensusId, -State, -County, -TotalPop, -Men, -Women, -is_ri, -Employed, -Citizen, -Income, -IncomeErr,-IncomePerCap, -IncomePerCapErr) %>%
+  filter(variable %in% large_diff_variables) %>%
+  ggplot(aes(x=variable, y=value, group=is_ri, fill=is_ri)) + geom_boxplot() + facet_grid(.~variable,scales = "free_x")  + theme(axis.text.x = element_text(angle=90), 
+  strip.background = element_blank(), strip.text.x = element_blank()) +
+  ggtitle("Why is Rhode Island So Rich Compared to Other States?")
+
+large_diff
+```
+
+Finally, we plot both per capita income by state and the Rhode Island differences in one single plot.
+
+```{r fig.height=10, fig.width=7}
+cowplot::plot_grid(per_cap_state, large_diff, nrow=2)
+
+```
